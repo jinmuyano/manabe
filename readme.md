@@ -180,6 +180,8 @@ urlpatterns=[]
 
 ##### public models.py
 
+公共字段表
+
 ```python
 from django.db import models
 
@@ -201,6 +203,8 @@ class CommonInfo(models.Model):
 ```
 
 ##### appinput models.py
+
+应用数据表
 
 ```python
 from django.db import models
@@ -268,5 +272,115 @@ python manage.py runserver 0.0.0.0:5000   #启动服务，查看后台，使用�
 
 ```sh
 # 创建目录和文件
+(manabe) root@database:~/devops/manabe/manabe/public# tree management/
+management/
+├── commands
+│   ├── fake_app.py    #修改model-App表数据
+│   ├── fake_data.py   #main文件，从此处调用其他文件修改数据
+│   ├── fake_user.py   #修改model-user表数据
+│   └── __init__.py    #空文件
+└── __init__.py    #空文件
+
+
+
+
+
+# fake_user.py 文件
+from django.contrib.auth.models import User,Group   #导入django自带的model（用户表）
+
+def fake_user_data():
+    User.objects.all().delete()   #清除所有用户
+    Group.objects.all().delete()   #清除所有用户组
+    print("delete all user data")
+    User.objects.create_user(username='Dylan', password="password")
+    User.objects.create_user(username='Tyler', password="password")
+    User.objects.create_user(username='Kyle', password="password")
+    User.objects.create_user(username='Dakota', password="password")
+    User.objects.create_user(username='Marcus', password="password")
+    User.objects.create_user(username='Samantha', password="password")
+    User.objects.create_user(username='Kayla', password="password")
+    User.objects.create_user(username='Sydney', password="password")
+    User.objects.create_user(username='Courtney', password="password")
+    User.objects.create_user(username='Mariah', password="password")
+    User.objects.create_user(username='tom', password="password")
+    User.objects.create_user(username='mary', password="password")
+    admin = User.objects.create_superuser('admin','admin@demon.com','admin')   #创建超级用户
+    root = User.objects.create_superuser('root','root@demon.com','root')     #创建超级用户
+    admin_group=Group.objects.create(name='admin')      #创建一个admin用户组
+    Group.objects.create(name='test')      #建立3个用户组
+    Group.objects.create(name='dev')
+    Group.objects.create(name='operate')
+    admin_users=[admin,root]
+    admin_group.user_set.set(admin_users)   #将2个超级用户加入admin组
+    print('create all user data')
+    
+ 
+ 
+    
+# fake_app.py 文件
+from random import choice
+from django.contrib.auth.models import User
+from appinput.models import App
+
+def fake_app_data():
+    App.objects.all().delete()
+    print('delete all app data')
+    user_set = User.objects.all()
+    app_list = ['ABC-FRONT-APP-ADMIN',
+                'ABC-FRONT-APP-NGINX',
+                'ABC-FRONT-APP-VUEJS',
+                'ABC-FRONT-APP-ANGULAR',
+                'ABC-FRONT-APP-BOOTSTRAP',
+                'ABC-BACKEND-NODEJS',
+                'ABC-BACKEND-JAVA',
+                'ABC-BACKEND-GO',
+                'ABC-BACKEND-PYTHON',
+                'ABC-BACKEND-SCALA',
+                'ZEP-FRONT-APP-ADMIN',
+                'ZEP-FRONT-APP-NGINX',
+                'ZEP-FRONT-APP-VUEJS',
+                'ZEP-FRONT-APP-ANGULAR',
+                'ZEP-FRONT-APP-BOOTSTRAP',
+                'ZEP-BACKEND-NODEJS',
+                'ZEP-BACKEND-JAVA',
+                'ZEP-BACKEND-GO',
+                'ZEP-BACKEND-PYTHON',
+                'ZEP-BACKEND-SCALA',
+                ]
+    for app_item in app_list:
+        App.objects.create(name=app_item, jenkins_job=app_item, git_url="http://localhost", build_cmd="mvn package",
+                           package_name=app_item + '.zip', manage_user=choice(user_set))
+    print('create all app data')
+    
+    
+    
+    
+    
+#fake_data.py 文件
+from django.core.management.base import BaseCommand
+from .fake_user import fake_user_data
+from .fake_app import fake_app_data
+
+class Command(BaseCommand):
+    help= 'It is a fake command,Import init data for test'
+
+    def handle(self, *args, **options):
+        self.stdout.write(self.style.SUCCESS('begin fake data'))
+        fake_user_data()
+        fake_app_data()
+        # fake_env_data()
+        # fake_server_data()
+        # fake_deploy_status_data()
+        # fake_deploy_data()
+        # fake_action_data()
+        # fake_permission_data()
+        self.stdout.write(self.style.SUCCESS("end fake data"))
+```
+
+envx models.py
+
+环境数据表
+
+```python
 ```
 
