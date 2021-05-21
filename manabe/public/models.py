@@ -14,4 +14,4 @@ class CommonInfo(models.Model):
 
     class Meta:
         abstract=True
-        ordering=('-change_date0',)
+        ordering=('-change_date',)
