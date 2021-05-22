@@ -88,11 +88,11 @@ DATABASES = {
 
         'NAME':'manabe',
 
-        'USER':'root',
+        'USER':'ubuntu',
 
-        'PASSWORD':'123',
+        'PASSWORD':'1234',
 
-        'HOST': '192.168.157.49',
+        'HOST': 'localhost',
 
         'PORT': '3306',
     }

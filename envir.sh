@@ -1,1 +1,1 @@
-. /root/.local/share/virtualenvs/manabe-4GkuCS_w/bin/activate
+. /home/ubuntu/.local/share/virtualenvs/manabe-vKHaTXdv/bin/activate

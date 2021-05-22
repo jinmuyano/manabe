@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand
 from .fake_user import fake_user_data
 from .fake_app import fake_app_data
 from .fake_env import fake_env_data
+from .fake_server import fake_server_data
 
 class Command(BaseCommand):
     help= 'It is a fake command,Import init data for test'
@@ -11,7 +12,7 @@ class Command(BaseCommand):
         fake_user_data()
         fake_app_data()
         fake_env_data()
-        # fake_server_data()
+        fake_server_data()
         # fake_deploy_status_data()
         # fake_deploy_data()
         # fake_action_data()
