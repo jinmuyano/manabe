@@ -117,8 +117,11 @@ INSTALLED_APPS = [
 
 ```sql
 # 安装数据库省略
-create database manabe;
-GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '123';
+create database manabe DEFAULT CHARACTER SET  utf8;
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '1234';
+GRANT ALL PRIVILEGES ON *.* TO 'ubuntu'@'%' IDENTIFIED BY '1234';
+GRANT ALL PRIVILEGES ON *.* TO 'ubuntu'@'localhost' IDENTIFIED BY '1234';
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' IDENTIFIED BY '1234';
 flush privileges;
 exit
 ```
@@ -177,6 +180,34 @@ urlpatterns=[]
 
 
 ### models
+
+##### 字符编码问题
+
+[修改数据库mysql字符编码为UTF8 - chbxw - 博客园](https://www.cnblogs.com/chengbao/p/4858709.html)
+
+```sh
+步骤2：修改my.cnf配置文件，修改后如下（/etc/my.cnf）：
+
+[client]
+
+#password      = your_password
+
+port           = 3306
+
+socket         = /var/lib/mysql/mysql.sock
+
+default-character-set=utf8     #设置默认编码为UTF8
+
+
+# sql
+show create table deploy_deploystatus;
+ALTER DATABASE manabe　DEFAULT    CHARACTER SET utf8  COLLATE utf8_general_ci;
+ALTER TABLE `deploy_deploystatus`  DEFAULT   CHARACTER   SET   utf8  COLLATE  utf8_general_ci;
+ALTER TABLE deploy_deploystatus CHANGE description description VARCHAR(100) CHARACTER SET utf8 COLLATE utf8_general_ci;
+
+```
+
+
 
 ##### public models.py
 
@@ -247,7 +278,7 @@ class App(CommonInfo):
         ordering=('-add_date',)
 ```
 
-##### 执行数据库迁移
+##### 数据库迁移
 
 ```sh
 python manage.py makemigrations
@@ -268,7 +299,7 @@ admin.site.register(models.App)
 python manage.py runserver 0.0.0.0:5000   #启动服务，查看后台，使用创建的超级用户密码
 ```
 
-##### 生成模拟数据
+##### 模拟数据
 
 ```sh
 # 创建目录和文件
@@ -368,7 +399,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('begin fake data'))
         fake_user_data()
         fake_app_data()
-        # fake_env_data()
+        # fake_env_data()     #加了哪个，则取消注释
         # fake_server_data()
         # fake_deploy_status_data()
         # fake_deploy_data()
@@ -377,7 +408,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("end fake data"))
 ```
 
-##### envx models.py +模拟数据
+##### envx models.py 
 
 环境数据表
 
@@ -417,51 +448,282 @@ python manage.py fake_data
 
 ##### serverinput models.py
 
+服务器表
+
 ```python
 from django.db import models
 from django.contrib.auth.models import User
-# Create your models here.
 from appinput.models import App
 from envx.models import Env
 from public.models import CommonInfo
 
+# Create your models here.
 
 class Server(CommonInfo):
     """
     服务器
     """
-    ip_address = models.CharField(max_length=24,
-                                  verbose_name="IP地址")
-    salt_name = models.CharField(max_length=128,
-                                 verbose_name="SaltStack minion")
-    port = models.CharField(max_length=100,
-                            verbose_name="端口")
-    app_name = models.ForeignKey(App,
-                                 related_name='app_name',
-                                 on_delete=models.CASCADE,
-                                 verbose_name="应用名")
-    env_name = models.ForeignKey(Env,
-                                 blank=True,
-                                 null=True,
-                                 related_name="server_env_name",
-                                 on_delete=models.CASCADE,
-                                 verbose_name="环境")
-    app_user = models.CharField(max_length=24,
-                                blank=True,
-                                null=True,
-                                verbose_name="执行程序用户")
-    op_user = models.ForeignKey(User,
-                                blank=True,
-                                null=True,
-                                on_delete=models.CASCADE,
-                                verbose_name="操作用户")
-    history_deploy = models.CharField(max_length=512,
-                                      blank=True,
-                                      null=True,
-                                      verbose_name="已部署版本")
-    deploy_status = models.CharField(max_length=128,
-                                     blank=True,
-                                     null=True,
-                                     verbose_name="发布状态(Err,Suc)")
+    # 服务器ip地址
+    ip_address=models.CharField(max_length=24,verbose_name="IP地址")
+    
+    # salt agent名称
+    salt_name=models.CharField(max_length=128,verbose_name="SaltStack minion")
+    
+    # 服务器上app对应的端口号
+    port=models.CharField(max_length=100,verbose_name="端口")
+
+    # 服务器对应的所有app应用
+    app_name=models.ForeignKey(App,related_name='app_name',on_delete=models.CASCADE,verbose_name="应用名")
+
+    env_name=models.ForeignKey(Env,blank=True,null=True,related_name="server_env_name",on_delete=models.CASCADE,verbose_name="环境")
+
+    # 服务启动用户，root或者其他
+    app_user=models.CharField(max_length=24,blank=True,null=True,verbose_name="执行程序用户")
+
+    # 谁进行了app操作
+    op_user=models.ForeignKey(User,blank=True,null=True,verbose_name="操作用户")
+
+    # 服务器已部署多少个发布单，回滚时需要
+    history_deploy=models.CharField(max_length=512,blank=True,null=True,verbose_name="已部署版本")
+
+    deploy_status=models.CharField(max_length=128,null=True,blank=True,verbose_name="发布状态(Err,Suc)")
+
+```
+
+- 数据迁移
+
+```
+python manage.py makemigrations serverinput
+python manage.py migrate serverinput
+```
+
+- admin注册
+
+```
+admin.py
+admin.site.register(models.Server)
+```
+
+- 生成模拟数据
+
+```python
+from random import choice
+from django.contrib.auth.models import User
+from appinput.models import App
+from envx.models import Env
+from serverinput.models import Server
+
+def fake_server_data():
+    Server.objects.all().delete()
+    print('delete all server data')
+
+    user_set=User.objects.all()
+    app_set=App.objects.all()
+    env_set=Env.objects.all()
+    for i in range(100):
+        ip_address=salt_name="192.168.0.{}".format(i)
+        for j in [80,443,8080,8888]:
+            port=j
+            name="192.168.0.{}_{}".format(i,port)
+            app_user=choice(['root','tomcat','javauser'])
+            op_user=choice(user_set)
+            app_item=choice(app_set)
+            env_item=choice(env_set)
+
+            Server.objects.create(name=name,ip_address=ip_address,port=port,salt_name=salt_name,env_name=env_item,app_name=app_item,op_user=op_user,app_user=app_user)
+    print('create all server data')
+
+
+# 执行
+python manage.py fake_data
+
+```
+
+##### deploy models.py
+
+发布状态数据表
+
+```python
+from django.db import models
+from public.models import CommonInfo
+# Create your models here.
+class DeployStatus(CommonInfo):
+    # 新建，编译，待发布，成功，失败，发布中
+    memo=models.CharField(max_length=1024,blank=True,verbose_name="备注")
+
+```
+
+- admin注册
+
+```
+from django.contrib import admin
+
+# Register your models here.
+from . import models
+admin.site.register(models.DeployStatus)
+```
+
+- 迁移
+
+```
+python manage.py makemigrations 
+python manage.py migrate 
+```
+
+- 生成模拟数据
+
+```python
+from deploy.models import DeployStatus
+
+def fake_deploy_status_data():
+    DeployStatus.objects.all().delete()
+    print('delete all deploy status data')
+    DeployStatus.objects.create(name="CREATE",description="新建",memo="新建")
+    DeployStatus.objects.create(name="BUILD",description="编译",memo="新建")
+    DeployStatus.objects.create(name="CREATE",description="准备发布",memo="新建")
+    DeployStatus.objects.create(name="CREATE",description="发布中...",memo="新建")
+    DeployStatus.objects.create(name="CREATE",description="发布完成",memo="新建")
+    DeployStatus.objects.create(name="CREATE",description="发布异常",memo="新建")
+    print('create all deploy status data')
+```
+
+- 发布单数据表
+
+```python
+from django.db import models
+from public.models import CommonInfo
+from appinput.models import App
+from django.contrib.auth.models import User
+from envx.models import Env
+
+# Create your models here.
+class DeployStatus(CommonInfo):
+    # 新建，编译，待发布，成功，失败，发布中
+    memo=models.CharField(max_length=1024,blank=True,verbose_name="备注")
+
+
+IS_INC_TOT_CHOICES=(('TOT',r'全量部署'),('INT',r'增量部署'))
+
+DEPLOY_TYPE_CHOICES=(('deployall',r'发布所有'),('deploypkg',r'发布程序'),('deploycfg',r'发布配置'),('rollback',r'回滚'),)
+
+class DeployPool(CommonInfo):
+    name=models.CharField(max_length=100,verbose_name="发布单编号")
+    description = models.CharField(max_length=1024,blank=True,verbose_name="描述")
+    app_name=models.ForeignKey(App,related_name='deploy_app',on_delete=models.CASCADE,verbose_name="APP应用")
+    deploy_no=models.IntegerField(blank=True,null=True,default=0)
+    branch_build=models.CharField(max_length=255,blank=True,null=True)
+    jenkins_number=models.CharField(max_length=255,blank=True,null=True)
+    code_number=models.CharField(max_length=255,choices=IS_INC_TOT_CHOICES,blank=True,null=True,verbose_name="全量或增量部署")
+    is_inc_tot = models.CharField(max_length=255,choices=IS_INC_TOT_CHOICES,blank=True, null=True,verbose_name="全量或增量部署")
+    deploy_type = models.CharField(max_length=255,choices=DEPLOY_TYPE_CHOICES,blank=True, null=True,verbose_name="发布程序或配置")
+    is_build = models.BooleanField(default=False,verbose_name="软件是否编译成功")
+    create_user = models.ForeignKey(User,related_name='deploy_create_user',on_delete=models.CASCADE,verbose_name="创建用户")
+    nginx_url = models.URLField(default=None, blank=True, null=True,verbose_name="Tengine URL")
+    env_name = models.ForeignKey(Env, blank=True, null=True,related_name="deploy_env_name",on_delete=models.CASCADE,verbose_name="环境")
+    deploy_status = models.ForeignKey(DeployStatus,related_name='deploy_pool_status',blank=True, null=True,on_delete=models.CASCADE,verbose_name="发布单状态")
+```
+
+- 迁移
+
+```
+python manage.py makemigrations deploy
+python manage.py migrate  deploy
+```
+
+- 模拟数据
+
+```python
+import random
+import time
+import string
+from random import choice
+from  django.contrib.auth.models import User
+from appinput.models import App
+from envx.models import Env
+from deploy.models import DeployStatus,DeployPool
+
+
+def fake_deploy_data():
+    DeployPool.objects.all().delete()
+    print('delete all deploy data')
+
+    app_set=App.objects.all()
+    env_set=Env.objects.all()
+    user_set=User.objects.all()
+    is_inc_tot=['TOT','INC']
+    deploy_type=['deployall','deploypkg','deploycfg']
+    deploy_status_set_env=DeployStatus.objects.filter(name__in=['READY','ING','FINISH','ERROR'])
+    deploy_status_set_create=DeployStatus.objects.get(name='CREATE')
+    deploy_status_set_build=DeployStatus.objects.get(name='BUILD')
+
+    for date_no in range(30):
+        random_letter=''.join(random.sample(string.ascii_letters,2))
+        time_str=time.strftime("%Y-%m-%d-%H%M%S",time.localtime())
+        fake_time_str=time_str.split("-")
+        fake_time_str[2]=str(date_no)
+        fake_time_str='-'.join(fake_time_str)
+        name=fake_time_str+random_letter.upper()
+        DeployPool.objects.create(name=name, description="test",
+                                  branch_build="master",
+                                  jenkins_number=date_no,
+                                  code_number=date_no + 10,
+                                  is_inc_tot=choice(is_inc_tot),
+                                  deploy_type=choice(deploy_type),
+                                  create_user=choice(user_set),
+                                  app_name=choice(app_set),
+                                  env_name=choice(env_set),
+                                  deploy_status=choice(deploy_status_set_env),
+                                  nginx_url="http://localhost/"
+                                  )
+
+    #deploy_status不同=创建
+    for date_no in range(30):
+        random_letter = ''.join(random.sample(string.ascii_letters, 2))
+        time_str = time.strftime("%Y-%m-%d-%H%M%S", time.localtime())
+        fake_time_str = time_str.split("-")
+        fake_time_str[2] = str(date_no)
+        fake_time_str = '-'.join(fake_time_str)
+        name = fake_time_str + random_letter.upper()
+        if date_no % 2 == 1:
+            DeployPool.objects.create(name=name,
+                                      description="test",
+                                      branch_build="master",
+                                      jenkins_number=date_no,
+                                      code_number=date_no+10,
+                                      is_inc_tot=choice(is_inc_tot),
+                                      deploy_type=choice(deploy_type),
+                                      create_user=choice(user_set),
+                                      app_name=choice(app_set),
+                                      deploy_status=deploy_status_set_create,
+                                      )
+        else:
+            DeployPool.objects.create(name=name,
+                                      description="test",
+                                      branch_build="master",
+                                      jenkins_number=date_no,
+                                      code_number=date_no + 10,
+                                      is_inc_tot=choice(is_inc_tot),
+                                      deploy_type=choice(deploy_type),
+                                      create_user=choice(user_set),
+                                      app_name=choice(app_set),
+                                      deploy_status=deploy_status_set_build,
+                                      nginx_url="http://localhost/"
+                                      )
+    print('create all deploy data')
+```
+
+
+
+- 发布单历史数据表
+
+```python
+# 发布单历史数据表
+class History(CommonInfo):
+    user = models.ForeignKey(User,  blank=True, null=True,related_name='history_user',on_delete=models.CASCADE,verbose_name="用户")
+    app_name = models.ForeignKey(App, blank=True, null=True,related_name='history_app',on_delete=models.CASCADE,verbose_name="APP应用")
+    env_name = models.ForeignKey(Env, blank=True, null=True,related_name="history_env_name",on_delete=models.CASCADE,verbose_name="环境")
+    deploy_name = models.ForeignKey(DeployPool,blank=True, null=True,related_name="history_deploy",on_delete=models.CASCADE,verbose_name="发布单")
+    do_type = models.CharField(max_length=32,blank=True, null=True,verbose_name="操作类型")
+    content = models.CharField(max_length=1024,blank=True, null=True,verbose_name="操作内容")
 ```
 
